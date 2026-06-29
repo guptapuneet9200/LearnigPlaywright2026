@@ -40,3 +40,7 @@ pnpm-debug.log*
 .env.production
 .env.staging
 .env.*.local
+
+# Temp local tools
+powershell.cmd
+
