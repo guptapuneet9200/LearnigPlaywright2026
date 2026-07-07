@@ -18,7 +18,7 @@ console.log(a1);
 /*
 Rules of Identifier
 1) Must start with a letter, underscore (_), Dollar($)
-2) Can contain letter, number, underscore (@), and Dollar($) sign
+2) Can contain letter, number, underscore (_), and Dollar($) sign
 3) Can not start with number
 4) Can not be a reserved word
 5) Can not contain space
@@ -53,7 +53,7 @@ console.log(name_1$1_2)
 var NAME = "Punit"
 var name = "punit"
 
-// Here JS is very funniest language because its breal there own rule 
+// Here JS is very funniest language because its break there own rule 
 var π = 3.14
 console.log(π)
 
