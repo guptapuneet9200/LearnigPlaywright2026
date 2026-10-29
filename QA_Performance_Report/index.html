@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QA Team Performance Report</title>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --green: #34d399;
+      --red: #f87171;
+      --amber: #fbbf24;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+    }
+    header { margin-bottom: 24px; }
+    header h1 { font-size: 26px; color: #fff; }
+    header p { color: var(--muted); margin-top: 6px; }
+    .grid { display: grid; gap: 16px; margin-bottom: 24px; }
+    .cards { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+    .card .value { font-size: 28px; font-weight: 700; margin-top: 6px; }
+    .card .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .green { color: var(--green); }
+    .red { color: var(--red); }
+    .amber { color: var(--amber); }
+    .blue { color: var(--accent); }
+    .charts { grid-template-columns: 1fr 1fr; }
+    @media (max-width: 900px) { .charts { grid-template-columns: 1fr; } }
+    .chart-card canvas { max-height: 300px; }
+    h2 {
+      font-size: 18px;
+      margin: 8px 0 14px;
+      color: #fff;
+    }
+    .member-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .member-card { border-top: 3px solid var(--accent); }
+    .member-card h3 { font-size: 16px; }
+    .member-card .role { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+    .member-card table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .member-card td { padding: 4px 0; }
+    .member-card td:last-child { text-align: right; font-weight: 600; }
+    table.main {
+      width: 100%; border-collapse: collapse; font-size: 14px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    }
+    table.main th, table.main td { padding: 10px 12px; text-align: left; }
+    table.main thead th { background: #0b1220; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+    table.main tbody tr { border-top: 1px solid var(--border); }
+    table.main tbody tr:hover { background: #24334a; }
+    .foot { color: var(--muted); font-size: 12px; text-align: center; margin-top: 24px; }
+    .bar {
+      height: 8px; background: #0b1220; border-radius: 4px; overflow: hidden; margin-top: 4px;
+    }
+    .bar > div { height: 100%; background: var(--green); border-radius: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+    .badge-good { background: rgba(52, 211, 153, .15); color: var(--green); }
+    .badge-warn { background: rgba(251, 191, 36, .15); color: var(--amber); }
+    .badge-bad { background: rgba(248, 113, 113, .15); color: var(--red); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1 id="page-title">QA Team Performance Report</h1>
+  <p id="page-meta">Sprint · Generated on</p>
+</header>
+
+<!-- Sprint KPI summary cards -->
+<div class="grid cards" id="kpi-cards"></div>
+
+<!-- Burn-down and burn-up charts -->
+<div class="grid charts">
+  <div class="card chart-card">
+    <h2>📉 Burn-Down Chart</h2>
+    <canvas id="burndownChart"></canvas>
+    <p style="color:var(--muted);font-size:12px;margin-top:8px;">Remaining scope (points) vs ideal pace per day.</p>
+  </div>
+  <div class="card chart-card">
+    <h2>📈 Burn-Up Chart</h2>
+    <canvas id="burnupChart"></canvas>
+    <p style="color:var(--muted);font-size:12px;margin-top:8px;">Completed work vs total scope (scope adds shown by the rising total line).</p>
+  </div>
+</div>
+
+<!-- Team bar chart: points completed per member -->
+<div class="card" style="margin-bottom:24px;">
+  <h2>👥 Points Completed by Member</h2>
+  <canvas id="memberBarChart" style="max-height:300px;"></canvas>
+</div>
+
+<!-- Per-member performance cards -->
+<div class="grid member-grid" id="member-cards"></div>
+
+<!-- Jira issue table -->
+<div style="margin-top:24px;">
+  <h2>🗂️ Jira Issue Summary</h2>
+  <table class="main" id="jira-table"></table>
+</div>
+
+<p class="foot">Sample data for demonstration — replace <code>data.js</code> with your real Jira export to regenerate this report.</p>
+
+<script src="data.js"></script>
+<script>
+  const D = window.QA_REPORT;
+
+  // ---------- Header ----------
+  document.getElementById("page-title").textContent = `${D.team} — Performance Report`;
+  document.getElementById("page-meta").textContent =
+    `${D.sprint} · ${D.sprintRange} · Generated ${D.generatedOn}`;
+
+  // ---------- KPI cards ----------
+  const kpi = D.jiraSummary;
+  const kpiDefs = [
+    { label: "Issue Completion", value: kpi.completionPct + "%", sub: `${kpi.resolvedIssues}/${kpi.totalIssues} resolved`, cls: "green" },
+    { label: "Bugs Raised", value: kpi.bugsRaised, sub: `${kpi.bugsRejected} rejected`, cls: "blue" },
+    { label: "Bugs Escaped to Prod", value: kpi.escapedToProd, sub: kpi.escapedToProd <= 2 ? "Within target" : "Above target", cls: kpi.escapedToProd <= 2 ? "amber" : "red" },
+    { label: "Open Bugs", value: kpi.openBugs, sub: "Needs triage", cls: kpi.openBugs > 5 ? "red" : "green" },
+    { label: "Avg Resolution", value: kpi.avgCycleDays + " d", sub: "Per issue", cls: "green" },
+    { label: "Scope Added", value: "+" + kpi.scopeAddedPoints + " pts", sub: "Mid-sprint change", cls: "amber" },
+  ];
+  document.getElementById("kpi-cards").innerHTML = kpiDefs.map(k => `
+    <div class="card">
+      <div class="label">${k.label}</div>
+      <div class="value ${k.cls}">${k.value}</div>
+      <div class="sub">${k.sub}</div>
+    </div>`).join("");
+
+  // ---------- Shared chart options ----------
+  Chart.defaults.color = "#94a3b8";
+  Chart.defaults.borderColor = "#334155";
+
+  // ---------- Burn-down ----------
+  new Chart(document.getElementById("burndownChart"), {
+    type: "line",
+    data: {
+      labels: D.burnDown.dates,
+      datasets: [
+        { label: "Remaining", data: D.burnDown.remaining, borderColor: "#f87171", backgroundColor: "rgba(248,113,113,.15)", fill: true, tension: .3 },
+        { label: "Ideal", data: D.burnDown.ideal, borderColor: "#94a3b8", borderDash: [6, 4], fill: false }
+      ]
+    },
+    options: {
+      plugins: { legend: { position: "bottom" } },
+      scales: { y: { beginAtZero: true, title: { display: true, text: "Points remaining" } } }
+    }
+  });
+
+  // ---------- Burn-up ----------
+  new Chart(document.getElementById("burnupChart"), {
+    type: "line",
+    data: {
+      labels: D.burnUp.dates,
+      datasets: [
+        { label: "Completed", data: D.burnUp.completed, borderColor: "#34d399", backgroundColor: "rgba(52,211,153,.15)", fill: true, tension: .3 },
+        { label: "Total scope", data: D.burnUp.total, borderColor: "#fbbf24", borderDash: [6, 4], fill: false }
+      ]
+    },
+    options: {
+      plugins: { legend: { position: "bottom" } },
+      scales: { y: { beginAtZero: true, title: { display: true, text: "Points" } } }
+    }
+  });
+
+  // ---------- Member bar chart ----------
+  new Chart(document.getElementById("memberBarChart"), {
+    type: "bar",
+    data: {
+      labels: D.members.map(m => m.name),
+      datasets: [
+        { label: "Points completed", data: D.members.map(m => m.pointsCompleted), backgroundColor: "#38bdf8" },
+        { label: "Bugs found", data: D.members.map(m => m.bugsFound), backgroundColor: "#34d399" }
+      ]
+    },
+    options: {
+      plugins: { legend: { position: "bottom" } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+
+  // ---------- Member cards ----------
+  const statusBadge = (v) => v === 0 ? '<span class="badge badge-good">Perfect</span>'
+    : v <= 1 ? '<span class="badge badge-good">Good</span>'
+    : v <= 2 ? '<span class="badge badge-warn">Watch</span>'
+    : '<span class="badge badge-bad">Needs attention</span>';
+
+  document.getElementById("member-cards").innerHTML = D.members.map(m => {
+    const resRate = Math.round((m.issuesResolved / m.issuesAssigned) * 100);
+    return `
+    <div class="card member-card">
+      <h3>${m.name}</h3>
+      <div class="role">${m.role}</div>
+      <table>
+        <tr><td>Issues resolved</td><td>${m.issuesResolved}/${m.issuesAssigned} <span style="color:var(--muted)">(${resRate}%)</span></td></tr>
+        <tr><td>Points completed</td><td>${m.pointsCompleted}</td></tr>
+        <tr><td>Bugs found</td><td>${m.bugsFound}</td></tr>
+        <tr><td>Bugs missed</td><td>${m.bugsMissed} ${statusBadge(m.bugsMissed)}</td></tr>
+        <tr><td>Avg resolution time</td><td>${m.avgResolutionDays} days</td></tr>
+        <tr><td>Coverage</td><td>${m.coveragePct}%
+          <div class="bar"><div style="width:${m.coveragePct}%"></div></div></td></tr>
+        <tr><td>Reviews done</td><td>${m.reviewsDone}</td></tr>
+        <tr><td>Trend</td><td class="${m.trend.startsWith("+") ? "green" : "red"}">${m.trend}</td></tr>
+      </table>
+    </div>`;
+  }).join("");
+
+  // ---------- Jira table ----------
+  const tableData = [
+    ["Total issues in sprint", kpi.totalIssues],
+    ["Resolved / closed", kpi.resolvedIssues + " (" + kpi.completionPct + "%)"],
+    ["Bugs raised", kpi.bugsRaised],
+    ["Bugs rejected (invalid/duplicate)", kpi.bugsRejected],
+    ["Bugs escaped to production", kpi.escapedToProd],
+    ["Open / in-progress bugs", kpi.openBugs],
+    ["Scope added mid-sprint", "+" + kpi.scopeAddedPoints + " points"],
+    ["Avg cycle time", kpi.avgCycleDays + " days"],
+  ];
+  document.getElementById("jira-table").innerHTML =
+    `<thead><tr><th>Metric</th><th>Value</th></tr></thead>` +
+    `<tbody>${tableData.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}</tbody>`;
+</script>
+</body>
+</html>
