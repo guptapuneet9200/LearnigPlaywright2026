@@ -11,5 +11,5 @@ class car{
 }
 
 let obj = new car();
-console.log(obj);
-console.log(obj.b);
+// console.log(obj);
+console.log(obj.b); 
